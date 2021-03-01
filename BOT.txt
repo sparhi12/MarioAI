@@ -1,0 +1,68 @@
+import retro
+import numpy as np
+import cv2
+import neat
+import pickle
+
+env = retro.make(game='SuperMarioBros-Nes', state='Level1-1')
+
+def eval_genomes(genomes, config):
+    inx = 30 #SNES width is 240, so 30 is shrunken width
+    iny = 28 # SNES height is 224, so 28 is shruken height
+    
+    for genome_id, genome in genomes:
+        img =  env.reset() #initial img
+        
+        neural_net = neat.nn.recurrent.RecurrentNetwork.create(genome, config)
+    
+        max_fitness = 0
+        fitness = 0
+        counter = 0
+        
+        done = False
+        
+        while not done:
+            env.render()
+            
+            img = cv2.resize(img, (inx,iny))
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img = np.reshape(img, (inx,iny))
+            
+            flattened_img = np.ndarray.flatten(img)
+            
+            action = neural_net.activate(flattened_img)
+            
+            img, reward, done, info = env.step(action)
+            
+            fitness += reward
+            
+            if fitness > max_fitness:
+                max_fitness = fitness
+                counter = 0
+            else:
+                counter += 1
+                
+            if done or counter == 250:
+                done = True
+                print(genome_id, fitness_current)
+                
+            genome.fitness = fitness
+            
+        
+config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, 'config-feedforward.txt')
+
+p = neat.Population(config)
+
+p.add_reporter(neat.StdOutReporter(True))
+stats = neat.StatisticsReporter()
+p.add_reporter(stats)
+p.add_reporter(neat.Checkpointer(10))
+
+winner = p.run(eval_genomes)
+
+with open('winner.pkl', 'wb') as output:
+    pickle.dump(winner, output, 1)
+
+env.close()
+
+
